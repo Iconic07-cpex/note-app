@@ -1,10 +1,12 @@
 # Notes App - CRUD Application
 
-A full-stack notes application built with React, Tailwind CSS, FastAPI, and SQLite.
+A full-stack notes application with robust validation and error handling.
 
 ## Features
 
 - ✅ Create, Read, Update, and Delete notes
+- ✅ Frontend and backend validation
+- ✅ User-friendly error notifications
 - ✅ Clean and responsive UI
 - ✅ RESTful API backend
 - ✅ SQLite database for persistence
@@ -15,11 +17,14 @@ A full-stack notes application built with React, Tailwind CSS, FastAPI, and SQLi
 - React 18
 - Vite
 - Tailwind CSS
+- Axios (API client)
+- React-Toastify (notifications)
 
 **Backend:**
 - Python FastAPI
-- SQLAlchemy
-- SQLite
+- SQLAlchemy ORM
+- Pydantic validation
+- SQLite database
 
 ## Setup Instructions
 
@@ -41,7 +46,7 @@ venv\Scripts\activate
 source venv/bin/activate
 
 pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+uvicorn app.main:app --reload
 ```
 
 Backend runs at: http://localhost:8000
@@ -50,11 +55,24 @@ Backend runs at: http://localhost:8000
 
 ```bash
 cd frontend
-npm install
+npm install  # Install dependencies including axios and react-toastify
 npm run dev
 ```
 
 Frontend runs at: http://localhost:5173
+
+## Validation Rules
+
+**Title:**
+- Required field
+- Minimum 3 characters
+- Maximum 150 characters
+- Whitespace is trimmed
+
+**Content:**
+- Required field
+- Minimum 10 characters
+- Maximum 10,000 characters
 
 ## API Endpoints
 
@@ -64,23 +82,32 @@ Frontend runs at: http://localhost:5173
 - `PUT /api/notes/{id}` - Update a note
 - `DELETE /api/notes/{id}` - Delete a note
 
+## Error Handling
+
+The application provides clear error messages for:
+- Validation errors (inline and toast notifications)
+- Network errors
+- 404 Not Found errors
+- Server errors
+
 ## Project Structure
 
 ```
 notes-app/
 ├── backend/           # FastAPI backend
 │   ├── app/
-│   │   ├── main.py
-│   │   ├── models.py
-│   │   ├── schemas.py
-│   │   └── database.py
+│   │   ├── main.py        # API routes and error handlers
+│   │   ├── models.py      # SQLAlchemy models
+│   │   ├── schemas.py     # Pydantic schemas with validation
+│   │   └── database.py    # Database configuration
 │   └── requirements.txt
 │
 └── frontend/          # React frontend
     ├── src/
-    │   ├── App.jsx
-    │   ├── components/
-    │   └── main.jsx
+    │   ├── App.jsx           # Main application component
+    │   ├── api.js            # Axios instance and error interceptor
+    │   ├── components/       # React components
+    │   └── main.jsx          # Application entry point
     └── package.json
 ```
 
