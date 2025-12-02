@@ -1,11 +1,8 @@
-from fastapi import FastAPI, HTTPException, Depends, APIRouter, Request
+from fastapi import FastAPI, HTTPException, Depends, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
-from pydantic import ValidationError
 
 from . import models, schemas
 from .database import engine, get_db
@@ -15,51 +12,6 @@ models.Base.metadata.create_all(bind=engine)
 
 # Initialize FastAPI app
 app = FastAPI(title="Notes API", version="1.0.0")
-
-# Custom exception handler for Pydantic validation errors
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle Pydantic validation errors with standardized format"""
-    errors = {}
-    
-    for error in exc.errors():
-        field_name = error['loc'][-1] if error['loc'] else 'unknown'
-        error_msg = error['msg']
-        
-        # Customize error messages based on type
-        if error['type'] == 'value_error':
-            # Use the custom error message from our validators
-            errors[field_name] = str(error['ctx']['error']) if 'ctx' in error and 'error' in error['ctx'] else error_msg
-        else:
-            errors[field_name] = error_msg
-    
-    return JSONResponse(
-        status_code=422,
-        content={
-            "error": {
-                "code": "VALIDATION_ERROR",
-                "message": "One or more validation errors occurred.",
-                "fields": errors
-            }
-        }
-    )
-
-# Custom exception handler for general HTTP exceptions
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handle HTTP exceptions with standardized format"""
-    error_code = "NOT_FOUND_ERROR" if exc.status_code == 404 else "SERVER_ERROR"
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": {
-                "code": error_code,
-                "message": exc.detail,
-                "fields": {}
-            }
-        }
-    )
 
 # Configure CORS
 app.add_middleware(

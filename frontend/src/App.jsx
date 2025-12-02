@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import NoteForm from './components/NoteForm';
 import NoteCard from './components/NoteCard';
-import api from './api';
-import { toast } from 'react-toastify';
+
+// API URL - change this if your backend runs on a different port
+const API_URL = 'http://localhost:8000/api';
 
 function App() {
     // State to store all notes
@@ -20,22 +21,16 @@ function App() {
     // Function to get all notes from the backend
     const fetchNotes = async () => {
         try {
-            const response = await api.get('/notes');
+            const response = await fetch(`${API_URL}/notes`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
             // Ensure data is an array
-            setNotes(Array.isArray(response.data) ? response.data : []);
+            setNotes(Array.isArray(data) ? data : []);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching notes:', error);
-
-            // Show appropriate error toast
-            if (error.normalizedError) {
-                if (error.normalizedError.code === 'NETWORK_ERROR') {
-                    toast.error(error.normalizedError.message);
-                } else {
-                    toast.error('Failed to load notes. Please try again.');
-                }
-            }
-
             // Set notes to empty array on error
             setNotes([]);
             setLoading(false);
@@ -45,54 +40,41 @@ function App() {
     // Function to create a new note
     const createNote = async (noteData) => {
         try {
-            const response = await api.post('/notes', noteData);
+            const response = await fetch(`${API_URL}/notes`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(noteData),
+            });
 
-            // Refresh the notes list
-            fetchNotes();
-            toast.success('Note created successfully!');
+            if (response.ok) {
+                // Refresh the notes list
+                fetchNotes();
+            }
         } catch (error) {
             console.error('Error creating note:', error);
-
-            // Handle validation errors
-            if (error.normalizedError) {
-                if (error.normalizedError.code === 'VALIDATION_ERROR') {
-                    toast.error('Please fix the highlighted fields.');
-                    // Return field errors to the form
-                    return error.normalizedError.fields;
-                } else if (error.normalizedError.code === 'NETWORK_ERROR') {
-                    toast.error(error.normalizedError.message);
-                } else {
-                    toast.error('Failed to create note. Please try again.');
-                }
-            }
         }
     };
 
     // Function to update an existing note
     const updateNote = async (noteData) => {
         try {
-            const response = await api.put(`/notes/${editingNote.id}`, noteData);
+            const response = await fetch(`${API_URL}/notes/${editingNote.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(noteData),
+            });
 
-            // Clear editing state and refresh notes
-            setEditingNote(null);
-            fetchNotes();
-            toast.success('Note updated successfully!');
+            if (response.ok) {
+                // Clear editing state and refresh notes
+                setEditingNote(null);
+                fetchNotes();
+            }
         } catch (error) {
             console.error('Error updating note:', error);
-
-            // Handle different error types
-            if (error.normalizedError) {
-                if (error.normalizedError.code === 'VALIDATION_ERROR') {
-                    toast.error('Please fix the highlighted fields.');
-                    return error.normalizedError.fields;
-                } else if (error.normalizedError.code === 'NOT_FOUND_ERROR') {
-                    toast.error('Note not found.');
-                } else if (error.normalizedError.code === 'NETWORK_ERROR') {
-                    toast.error(error.normalizedError.message);
-                } else {
-                    toast.error('Failed to update note. Please try again.');
-                }
-            }
         }
     };
 
@@ -101,36 +83,26 @@ function App() {
         // Ask for confirmation before deleting
         if (window.confirm('Are you sure you want to delete this note?')) {
             try {
-                const response = await api.delete(`/notes/${noteId}`);
+                const response = await fetch(`${API_URL}/notes/${noteId}`, {
+                    method: 'DELETE',
+                });
 
-                // Refresh the notes list
-                fetchNotes();
-                toast.success('Note deleted successfully!');
+                if (response.ok) {
+                    // Refresh the notes list
+                    fetchNotes();
+                }
             } catch (error) {
                 console.error('Error deleting note:', error);
-
-                // Handle different error types
-                if (error.normalizedError) {
-                    if (error.normalizedError.code === 'NOT_FOUND_ERROR') {
-                        toast.error('Note not found.');
-                    } else if (error.normalizedError.code === 'NETWORK_ERROR') {
-                        toast.error(error.normalizedError.message);
-                    } else {
-                        toast.error('Failed to delete note. Please try again.');
-                    }
-                }
             }
         }
     };
 
     // Handle form submission (create or update)
-    const handleFormSubmit = async (noteData) => {
+    const handleFormSubmit = (noteData) => {
         if (editingNote) {
-            const errors = await updateNote(noteData);
-            return errors; // Return errors to form for inline display
+            updateNote(noteData);
         } else {
-            const errors = await createNote(noteData);
-            return errors; // Return errors to form for inline display
+            createNote(noteData);
         }
     };
 
