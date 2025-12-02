@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import NoteForm from './components/NoteForm';
 import NoteCard from './components/NoteCard';
-
-// API URL - change this if your backend runs on a different port
-const API_URL = 'http://localhost:8000/api';
+import api from './api';
+import { toast } from 'react-toastify';
 
 function App() {
     // State to store all notes
@@ -21,16 +20,22 @@ function App() {
     // Function to get all notes from the backend
     const fetchNotes = async () => {
         try {
-            const response = await fetch(`${API_URL}/notes`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
+            const response = await api.get('/notes');
             // Ensure data is an array
-            setNotes(Array.isArray(data) ? data : []);
+            setNotes(Array.isArray(response.data) ? response.data : []);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching notes:', error);
+
+            // Show appropriate error toast
+            if (error.normalizedError) {
+                if (error.normalizedError.code === 'NETWORK_ERROR') {
+                    toast.error(error.normalizedError.message);
+                } else {
+                    toast.error('Failed to load notes. Please try again.');
+                }
+            }
+
             // Set notes to empty array on error
             setNotes([]);
             setLoading(false);
@@ -40,41 +45,56 @@ function App() {
     // Function to create a new note
     const createNote = async (noteData) => {
         try {
-            const response = await fetch(`${API_URL}/notes`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(noteData),
-            });
+            const response = await api.post('/notes', noteData);
 
-            if (response.ok) {
-                // Refresh the notes list
-                fetchNotes();
-            }
+            // Refresh the notes list
+            fetchNotes();
+            toast.success('Note created successfully!');
         } catch (error) {
             console.error('Error creating note:', error);
+
+            // Handle validation errors
+            if (error.normalizedError) {
+                if (error.normalizedError.code === 'VALIDATION_ERROR') {
+                    toast.error('Please fix the highlighted fields.');
+                    // Return field errors to the form
+                    return error.normalizedError.fields;
+                } else if (error.normalizedError.code === 'NETWORK_ERROR') {
+                    toast.error(error.normalizedError.message);
+                } else {
+                    toast.error('Failed to create note. Please try again.');
+                }
+            }
         }
     };
 
     // Function to update an existing note
     const updateNote = async (noteData) => {
         try {
-            const response = await fetch(`${API_URL}/notes/${editingNote.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(noteData),
-            });
+            const response = await api.put(`/notes/${editingNote.id}`, noteData);
 
-            if (response.ok) {
-                // Clear editing state and refresh notes
-                setEditingNote(null);
-                fetchNotes();
-            }
+            // Clear editing state
+            setEditingNote(null);
+            // Refresh the notes list
+            fetchNotes();
+            toast.success('Note updated successfully!');
         } catch (error) {
             console.error('Error updating note:', error);
+
+            // Handle different error types
+            if (error.normalizedError) {
+                if (error.normalizedError.code === 'VALIDATION_ERROR') {
+                    toast.error('Please fix the highlighted fields.');
+                    // Return field errors to the form
+                    return error.normalizedError.fields;
+                } else if (error.normalizedError.code === 'NOT_FOUND_ERROR') {
+                    toast.error('Note not found.');
+                } else if (error.normalizedError.code === 'NETWORK_ERROR') {
+                    toast.error(error.normalizedError.message);
+                } else {
+                    toast.error('Failed to update note. Please try again.');
+                }
+            }
         }
     };
 
@@ -83,82 +103,78 @@ function App() {
         // Ask for confirmation before deleting
         if (window.confirm('Are you sure you want to delete this note?')) {
             try {
-                const response = await fetch(`${API_URL}/notes/${noteId}`, {
-                    method: 'DELETE',
-                });
+                const response = await api.delete(`/notes/${noteId}`);
 
-                if (response.ok) {
-                    // Refresh the notes list
-                    fetchNotes();
-                }
+                // Refresh the notes list
+                fetchNotes();
+                toast.success('Note deleted successfully!');
             } catch (error) {
                 console.error('Error deleting note:', error);
+
+                // Handle errors
+                if (error.normalizedError) {
+                    if (error.normalizedError.code === 'NOT_FOUND_ERROR') {
+                        toast.error('Note not found.');
+                    } else if (error.normalizedError.code === 'NETWORK_ERROR') {
+                        toast.error(error.normalizedError.message);
+                    } else {
+                        toast.error('Failed to delete note. Please try again.');
+                    }
+                }
             }
         }
     };
 
-    // Handle form submission (create or update)
-    const handleFormSubmit = (noteData) => {
-        if (editingNote) {
-            updateNote(noteData);
-        } else {
-            createNote(noteData);
-        }
-    };
-
-    // Handle edit button click
-    const handleEdit = (note) => {
+    // Function to start editing a note
+    const startEdit = (note) => {
         setEditingNote(note);
     };
 
-    // Handle cancel edit
-    const handleCancelEdit = () => {
+    // Function to cancel editing
+    const cancelEdit = () => {
         setEditingNote(null);
+    };
+
+    // Function to handle form submission
+    const handleFormSubmit = async (noteData) => {
+        if (editingNote) {
+            return await updateNote(noteData);
+        } else {
+            return await createNote(noteData);
+        }
     };
 
     return (
         <div className="min-h-screen bg-gray-100">
-            {/* Header */}
-            <div className="bg-blue-600 text-white py-6 shadow-lg">
-                <div className="container mx-auto px-4">
-                    <h1 className="text-4xl font-bold">📝 My Notes App</h1>
-                    <p className="text-blue-100 mt-2">Keep track of your thoughts and ideas</p>
-                </div>
-            </div>
-
-            {/* Main Content */}
             <div className="container mx-auto px-4 py-8">
-                <div className="max-w-3xl mx-auto">
-                    {/* Note Form */}
-                    <NoteForm
-                        onSubmit={handleFormSubmit}
-                        editingNote={editingNote}
-                        onCancel={handleCancelEdit}
-                    />
+                <h1 className="text-4xl font-bold text-center mb-8 text-gray-800">📝 My Notes App</h1>
 
-                    {/* Notes List */}
-                    <div>
-                        <h2 className="text-2xl font-bold mb-4 text-gray-800">
-                            Your Notes ({notes.length})
-                        </h2>
+                {/* Note Form */}
+                <NoteForm
+                    onSubmit={handleFormSubmit}
+                    editingNote={editingNote}
+                    onCancelEdit={cancelEdit}
+                />
 
-                        {loading ? (
-                            <p className="text-gray-600">Loading notes...</p>
-                        ) : notes.length === 0 ? (
-                            <p className="text-gray-600">
-                                No notes yet. Create your first note above!
-                            </p>
-                        ) : (
-                            notes.map((note) => (
+                {/* Notes List */}
+                <div className="mt-8">
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-700">Your Notes</h2>
+                    {loading ? (
+                        <p className="text-center text-gray-600">Loading notes...</p>
+                    ) : notes.length === 0 ? (
+                        <p className="text-center text-gray-600">No notes yet. Create your first note above!</p>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {notes.map(note => (
                                 <NoteCard
                                     key={note.id}
                                     note={note}
-                                    onEdit={handleEdit}
+                                    onEdit={startEdit}
                                     onDelete={deleteNote}
                                 />
-                            ))
-                        )}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
